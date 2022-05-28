@@ -1,0 +1,199 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+	<title>Room</title>
+	<meta charset="UTF-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1">
+  <script   src="https://code.jquery.com/jquery-3.1.1.min.js"   integrity="sha256-hVVnYaiADRTO2PzUGmuLJr8BLUSjGIZsDYGmIJLv2b8="   crossorigin="anonymous"></script>
+  <!--===============================================================================================-->	
+{% load static %}
+<link rel="icon" type="image/png" href="{% static 'assets/images/icons/favicon.ico'  %}"/>
+<!--===============================================================================================-->
+<link rel="stylesheet" type="text/css" href="{% static 'assets/vendor/bootstrap/css/bootstrap.min.css'  %}" >
+<!--===============================================================================================-->
+<link rel="stylesheet" type="text/css" href="{% static 'assets/fonts/font-awesome-4.7.0/css/font-awesome.min.css'  %}" >
+<!--===============================================================================================-->
+<link rel="stylesheet" type="text/css" href="{% static 'assets/vendor/animate/animate.css'  %}" >
+<!--===============================================================================================-->	
+<link rel="stylesheet" type="text/css" href="{% static 'assets/vendor/css-hamburgers/hamburgers.min.css'  %}" >
+<!--===============================================================================================-->
+<link rel="stylesheet" type="text/css" href="{% static 'assets/vendor/select2/select2.min.css'  %}" >
+<!--===============================================================================================-->
+<link rel="stylesheet" type="text/css" href="{% static 'assets/css/util.css'  %}" >
+<link rel="stylesheet" type="text/css" href="{% static 'assets/css/main2.css'  %}" >
+<!--===============================================================================================-->
+</head>
+<body>
+	<video id="video" autoplay style="display: none"></video>
+	<h1 id='emo_name' >None</h1>
+	<img id='emo_img' class='emo_img_c' src={% static "assets/emotions/none.png" %}></img>
+	<!--<canvas id="canvas"></canvas>-->
+	<script>
+		$(document).ready(function(){
+		
+		setInterval(function(){
+			$.ajax({
+				type: 'GET',
+				url : "/getMessages/{{ room }}/",
+				success: function(response){
+					console.log(response);
+					$("#display").empty();
+          response.messages.reverse();
+					for (var key in response.messages)
+					{
+            if ($('#username').val() == response.messages[key].user) {
+              var temp="<div class='mess-container message-body-self'><b>"+response.messages[key].user+"</b><p>"+response.messages[key].content+"</p><span class='time-left'>"+response.messages[key].date+"</span></div>";
+						  $("#display").append(temp);
+            } else {
+              var temp="<div class='mess-container message-body'><b>"+response.messages[key].user+"</b><p>"+response.messages[key].content+"</p><span class='time-left'>"+response.messages[key].date+"</span></div>";
+              $("#display").append(temp);
+            }
+					}
+				},
+				error: function(response){
+					alert('An error occured')
+				}
+			});
+		},1000);
+		})
+	</script>
+	
+	<div class="limiter">
+		<div class="container-login100">
+				<button class="back-button"><a href = '/messenger'><img src="https://cdn-icons-png.flaticon.com/512/93/93634.png" width="40px" height="40px"></a></button>
+				<span class="login100-form-title">{{ room }} room</span>
+				<div id  = "display" class="chat">
+						{#<div class="mess-container message-body">#}
+						{#	<b>Van</b><p>Hello world!</p>#}
+						{#	<span class = "time-left">30th April, 2022</span>#}
+						{#</div>#}
+				</div>
+
+				<form class="login100-form validate-form" id="post-form">
+					{% csrf_token %}
+
+					<input type="hidden" name="username" id="username" value="{{ username }}"/>
+        			<input type="hidden" name="room_id" id="room_id" value="{{ room_details.id }}"/>
+					<div class="wrap-input100">
+						<input class="input100" type="text" name="message" id="message"/>
+						<input type="submit" class="login100-form-btn" value="✔"/>
+					</div>
+
+				</form>
+		</div>
+	</div>
+	
+	
+
+	
+<!--===============================================================================================-->	
+<script src="{% static 'assets/vendor/jquery/jquery-3.2.1.min.js' %}"></script>
+<!--===============================================================================================-->
+
+<script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs"></script>
+<script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/blazeface"></script>
+
+
+
+
+
+<script>
+	let video = document.getElementById("video");
+	let model;
+	let fer_model;
+	(async function () {
+		fer_model = await tf.loadLayersModel("{% static "assets/model/model.json" %}");
+	})();
+
+	var emotion_dict = {0: 'Anger', 1: 'Disgust', 2: 'Fear', 3: 'Happiness', 4: 'Neutral', 5: 'Sadness', 6: 'Surprise'};
+	var emo_img_dict = {0: 'https://i.postimg.cc/G2xt50KB/emotion-0.png', 1: 'https://i.postimg.cc/d3W1J8zw/emotion-1.png', 2: 'https://i.postimg.cc/WzpzR9Y5/emotion-2.png',
+						 3: 'https://i.postimg.cc/fW5k7Nkp/emotion-3.png', 4: 'https://i.postimg.cc/653qYmv3/emotion-4.png', 5: 'https://i.postimg.cc/qM5RYxsG/emotion-5.png', 
+						 6: 'https://i.postimg.cc/K83zy3Qh/emotion-6.png'}
+
+	const setupCamera = () => {
+		navigator.mediaDevices
+		.getUserMedia({
+			video: { width: 600, height: 400 },
+			audio: false,
+		})
+		.then((stream) => {
+			video.srcObject = stream;
+		});
+	};
+
+	const detectFaces = async () => {
+		const prediction = await model.estimateFaces(video, false);
+		
+		let imageTensor = tf.browser.fromPixels(video);
+		const offset = tf.scalar(255.0);
+		const normalized = imageTensor.div(offset);
+		const batched = normalized.expandDims(0);
+		let result = batched;
+
+		const size = 224;
+		const height = imageTensor.shape[0]; 
+		const width = imageTensor.shape[1]; 
+		const imgSize = Math.min(width, height); 
+		const left = prediction[0].topLeft[0];
+		const top = prediction[0].topLeft[1];
+		const right = prediction[0].bottomRight[0];
+		const bottom = prediction[0].bottomRight[1];
+		let boxes = [[top / height, left / width, bottom / height, right / width]];
+		result = tf.image.cropAndResize(batched, boxes, [0], [size,size]);
+
+		result = result.mul(offset)
+
+		const squezed = tf.squeeze(result);
+
+		let predicted = await fer_model.predict(squezed.expandDims(0)).data();
+		let max = Math.max(...predicted);
+		let index = predicted.indexOf(max);
+		document.getElementById("emo_name").innerHTML = emotion_dict[index];
+		document.getElementById("emo_img").src = emo_img_dict[index];
+	}
+
+	setupCamera();
+	video.addEventListener("loadeddata", async () => {
+		model = await blazeface.load();
+		// call detect faces every 100 milliseconds or 10 times every second
+		setInterval(detectFaces, 1000);
+	});
+	</script>
+
+<!--===============================================================================================-->
+	<script src="{% static 'assets/vendor/bootstrap/js/popper.js' %}"></script>
+	<script src="{% static 'assets/vendor/bootstrap/js/bootstrap.min.js' %}"></script>
+<!--===============================================================================================-->
+	<script src="{% static 'assets/vendor/select2/select2.min.js' %}"></script>
+<!--===============================================================================================-->
+	<script src="{% static 'assets/vendor/tilt/tilt.jquery.min.js' %}"></script>
+	<script >
+		$('.js-tilt').tilt({
+			scale: 1.1
+		})
+	</script>
+<!--===============================================================================================-->
+	<script src="{% static 'assets/js/main.js' %}"></script>
+
+</body>
+<script type="text/javascript">
+	$(document).on('submit','#post-form',function(e){
+	  e.preventDefault();
+  
+	  $.ajax({
+		type:'POST',
+		url:'/send',
+		data:{
+			username:$('#username').val(),
+			room_id:$('#room_id').val(),
+			message:$('#message').val(),
+		  csrfmiddlewaretoken:$('input[name=csrfmiddlewaretoken]').val(),
+		},
+		success: function(data){
+		   //alert(data)
+		}
+	  });
+	  document.getElementById('message').value = ''
+	});
+  </script>
+</html>
